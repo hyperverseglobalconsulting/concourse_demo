@@ -44,7 +44,7 @@ EOF
 }
 
 resource "aws_eks_cluster" "cluster" {
-  name     = "django-k8s"
+  name     = "concourse-k8s"
   role_arn = aws_iam_role.eks_cluster.arn
 
   vpc_config {
@@ -101,7 +101,7 @@ resource "aws_eks_node_group" "node_group" {
 
   tags = {
     Terraform = "true"
-    EKS       = "django-k8s"
+    EKS       = "concourse-k8s"
   }
 
 #  depends_on = [

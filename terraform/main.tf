@@ -7,7 +7,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "django-k8s"
+    bucket = "concourse-k8s"
     key    = "terraform/terraform.tfstate"
     region = "us-east-2"
     profile = "eksuser"

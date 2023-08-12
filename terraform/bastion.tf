@@ -8,7 +8,7 @@ resource aws_vpc "k8s" {
   enable_dns_hostnames = true
 
   tags = {
-    Name = "django-k8s"
+    Name = "concourse-k8s"
   }
 }
 

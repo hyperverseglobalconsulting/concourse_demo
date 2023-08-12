@@ -244,25 +244,29 @@
         dest: '~/concourse_demo'
         version: main
         depth: 1 # Shallow clone, gets only the latest revision
+      become: no
 
     - name: Get the ELB name associated with ingress-nginx
       command: kubectl get svc -n ingress-nginx ingress-nginx-controller -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}'
       become_user: ec2-user
       register: elb_hostname_result
       ignore_errors: true
+      become: no
 
     - name: Generate Ingress YAML from template
       template:
-        src: ~/django_demo/api-routes/ingress.yaml.template
-        dest: ~/django_demo/api-routes/ingress.yaml
+        src: ~/concourse_demo/api-routes/ingress.yaml.template
+        dest: ~/concourse_demo/api-routes/ingress.yaml
       vars:
         HOSTNAME: "{{ elb_hostname_result.stdout }}"
       when: elb_hostname_result.stdout != ""
+      become: no
 
     # Assuming you want to apply this ingress after creation
     - name: Apply the Ingress to the Kubernetes Cluster
-      command: kubectl apply -f ~/django_demo/api-routes/ingress.yaml
+      command: kubectl apply -f ~/concourse_demo/api-routes/ingress.yaml
       when: elb_hostname_result.stdout != ""
+      become: no
 
     - debug:
         msg:

@@ -13,7 +13,7 @@ variable "availability_zones" {
 variable "key_name" {
   description = "The name of the key pair"
   type        = string
-  default     = "django-k8s.pem"
+  default     = "concourse-k8s.pem"
 }
 
 variable "aws_region" {
@@ -37,7 +37,7 @@ variable "vpc_cidr" {
 variable "bucket_name" {
   description = "The S3 bucket name"
   type        = string
-  default     = "django-k8s"
+  default     = "concourse-k8s"
 }
 
 variable "server_name" {
