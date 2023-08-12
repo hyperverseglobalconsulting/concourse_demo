@@ -1,0 +1,271 @@
+---
+- name: Setup Kubernetes Tools
+  hosts: all
+  become: yes
+  vars:
+    cluster_arn: "{{ EKS_CLUSTER_ARN }}"
+    aws_access_key_id: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_access_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+    aws_region: "{{ AWS_REGION }}"
+    key_name: "{{KEY_NAME}}"
+
+  tasks:
+    - name: Install required packages
+      yum:
+        name:
+          - unzip
+          - git
+          - docker
+          - jq
+        state: latest
+
+    - name: Install kubectl
+      get_url:
+        url: "https://s3.us-west-2.amazonaws.com/amazon-eks/1.26.4/2023-05-11/bin/linux/amd64/kubectl"
+        dest: "/usr/local/bin/kubectl"
+        mode: '0755'
+
+    - name: Install aws-iam-authenticator
+      get_url:
+        url: "https://amazon-eks.s3.us-west-2.amazonaws.com/1.26.4/2023-05-11/bin/linux/amd64/aws-iam-authenticator"
+        dest: "/usr/local/bin/aws-iam-authenticator"
+        mode: '0755'
+
+    - name: Install eksctl
+      block:
+        - name: Get OS name
+          command: uname -s
+          register: os_name
+          changed_when: false
+        - name: Download eksctl
+          get_url:
+            url: "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_{{ os_name.stdout }}_amd64.tar.gz"
+            dest: "/tmp/eksctl.tar.gz"
+            validate_certs: no
+        - name: Extract eksctl
+          unarchive:
+            src: "/tmp/eksctl.tar.gz"
+            dest: "/usr/local/bin/"
+            remote_src: yes
+
+    - name: Download AWS CLI v2
+      get_url:
+        url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+        dest: "/tmp/awscliv2.zip"
+      become: no
+
+    - name: Unzip AWS CLI v2 package
+      unarchive:
+        src: "/tmp/awscliv2.zip"
+        dest: "/tmp/"
+        remote_src: yes
+      become: no
+
+    - name: Install AWS CLI v2
+      command: "/tmp/aws/install"
+
+    - name: Install Helm
+      block:
+        - name: Download Helm
+          get_url:
+            url: "https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz"
+            dest: "/tmp/helm.tar.gz"
+        - name: Extract Helm
+          unarchive:
+            src: "/tmp/helm.tar.gz"
+            dest: "/tmp/"
+            remote_src: yes
+        - name: Move Helm to bin directory
+          command: mv /tmp/linux-amd64/helm /usr/local/bin/helm
+
+    - name: Add Helm stable repository
+      command:
+        cmd: "helm repo add stable https://charts.helm.sh/stable"
+      become: no
+
+    - name: Add ingress-nginx Helm repository
+      command:
+        cmd: "helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx"
+      become: no
+
+    - name: Update Helm repositories
+      command:
+        cmd: "helm repo update"
+      become: no
+
+    - name: Configure AWS settings
+      command:
+        cmd: "aws configure set {{ item.name }} {{ item.value }}"
+      loop:
+        - { name: 'aws_access_key_id', value: '{{ aws_access_key_id }}' }
+        - { name: 'aws_secret_access_key', value: '{{ aws_secret_access_key }}' }
+        - { name: 'region', value: '{{ aws_region }}' }
+      become: no
+
+    - name: Update kubeconfig
+      command:
+        cmd: "aws eks update-kubeconfig --region {{ aws_region }} --name {{ cluster_arn.split('/')[-1] }}"
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
+        AWS_SECRET_ACCESS_KEY: "{{ aws_secret_access_key }}"
+        AWS_DEFAULT_REGION: "{{ aws_region }}"
+      become: no
+
+    - name: Install AWS EBS CSI Driver
+      command: kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/ecr/?ref=master"
+      register: output
+      become: no
+
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    - name: Update all packages
+      yum:
+        name: '*'
+        state: latest
+      become: yes
+
+    - name: Copy files to remote server's /tmp directory
+      copy:
+        src: "{{ item }}"
+        dest: "/tmp/{{ item }}"
+      with_items:
+        - requirements.txt
+      become: no
+
+    - name: Install Python packages from requirements.txt
+      pip:
+        requirements: /tmp/requirements.txt
+        executable: pip3
+      become: no
+
+    - name: Create ingress-nginx namespace
+      command:
+        cmd: kubectl create namespace ingress-nginx
+      ignore_errors: yes
+      become: no
+
+    - name: Install ingress-nginx using Helm in ingress-nginx namespace
+      command:
+        cmd: helm install ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx
+      become: no
+
+    - name: Add Concourse Helm Chart Repository
+      command:
+        cmd: helm repo add concourse https://concourse-charts.storage.googleapis.com/
+      register: helm_repo
+#      changed_when: "'concourse has been added' in helm_repo.stdout"
+      become: no
+
+    - name: Update Helm repositories
+      command: helm repo update
+      become: no
+
+    - name: Install Concourse using Helm
+      command: helm install concourse concourse/concourse
+#      changed_when: false
+      become: no
+
+#    - name: Get Concourse Web credentials
+#      shell: kubectl get secret --namespace default concourse-web -o jsonpath='{.data.concourse-username}' | base64 --decode
+#      register: concourse_username
+#      changed_when: false
+#      become: no
+#
+#    - name: Get Concourse Web password
+#      shell: kubectl get secret --namespace default concourse-web -o jsonpath='{.data.concourse-password}' | base64 --decode
+#      register: concourse_password
+#      changed_when: false
+#      become: no
+
+    - name: Check Concourse Web Service
+      shell: kubectl get svc | grep concourse-web
+      register: service_status
+      changed_when: false
+      become: no
+
+    - name: Get Concourse version from Helm
+      shell: helm list -n default -o json | jq -r '.[] | select(.name=="concourse") | .app_version'
+      register: concourse_version_result
+      become: no
+
+    - name: Set Concourse version
+      set_fact:
+        concourse_version: "{{ concourse_version_result.stdout }}"
+      become: no
+
+    - name: Install fly CLI
+      get_url:
+        url: "https://github.com/concourse/concourse/releases/download/v{{ concourse_version }}/fly-{{ concourse_version }}-linux-amd64.tgz"
+        dest: "/tmp/fly.tgz"
+        mode: '0755'
+      register: fly_downloaded
+      when: concourse_version is defined
+      become: no
+
+    - name: Extract fly CLI
+      unarchive:
+        src: "/tmp/fly.tgz"
+        dest: "/usr/local/bin"
+        remote_src: true
+      when: concourse_version is defined
+
+    - name: Set permissions for fly CLI
+      file:
+        path: "/usr/local/bin/fly"
+        mode: '0755'
+      when: concourse_version is defined
+
+    # kubectl port-forward setup (from bastion to Concourse pod)
+    - name: Get Concourse web pod name
+      shell: kubectl get pods -n default -l app=concourse-web -o jsonpath='{.items[0].metadata.name}'
+      register: concourse_pod
+      changed_when: false
+      become: no
+
+    - name: Start port forwarding in the background (Bastion to Concourse)
+      shell: "kubectl port-forward -n default {{ concourse_pod.stdout }} 8080:8080 &"
+      async: 10
+      poll: 0
+      become: no
+
+    - name: Clone specific branch of the repository
+      git:
+        repo: 'https://github.com/hyperverseglobalconsulting/concourse_demo.git'
+        dest: '~/concourse_demo'
+        version: main
+        depth: 1 # Shallow clone, gets only the latest revision
+
+    - name: Get the ELB name associated with ingress-nginx
+      command: kubectl get svc -n ingress-nginx ingress-nginx-controller -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+      become_user: ec2-user
+      register: elb_hostname_result
+      ignore_errors: true
+
+    - name: Generate Ingress YAML from template
+      template:
+        src: ~/django_demo/api-routes/ingress.yaml.template
+        dest: ~/django_demo/api-routes/ingress.yaml
+      vars:
+        HOSTNAME: "{{ elb_hostname_result.stdout }}"
+      when: elb_hostname_result.stdout != ""
+
+    # Assuming you want to apply this ingress after creation
+    - name: Apply the Ingress to the Kubernetes Cluster
+      command: kubectl apply -f ~/django_demo/api-routes/ingress.yaml
+      when: elb_hostname_result.stdout != ""
+
+    - debug:
+        msg:
+          - "Concourse Web UI credentials - Username: {{ concourse_username.stdout }}, Password: {{ concourse_password.stdout }}"
+          - "Concourse Web Service: {{ service_status.stdout }}"
+

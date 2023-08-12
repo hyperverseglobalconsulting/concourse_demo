@@ -1,0 +1,8 @@
+django==3.2.18
+djangorestframework==3.14.0
+boto3==1.20.4
+botocore==1.23.4
+django-cors-headers==4.0.0
+requests==2.26.0
+django-extensions==3.2.1
+psycopg2-binary==2.9.3

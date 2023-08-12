@@ -1,0 +1,10 @@
+.*
+!.gitignore
+.*.swp
+.*.swo
+*.bkp
+/bkp/
+*.out
+*.pem
+*.log
+!.gitlab-ci.yml
