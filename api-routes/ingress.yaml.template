@@ -7,19 +7,19 @@ metadata:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
   labels:
-    app.kubernetes.io/instance: "demo-ingress"
-    app.kubernetes.io/name: "demo-ingress"
-    app.kubernetes.io/version: "demo-ingress-v1.0.0"
+    app.kubernetes.io/instance: "demo-concourse"
+    app.kubernetes.io/name: "demo-concourse"
+    app.kubernetes.io/version: "demo-concourse-v1.0.0"
   name: "demo-ingress"
 spec:
   rules:
-  - host: "a90b846288fcf45809df52f7bf20cfda-1477076854.us-east-2.elb.amazonaws.com"
+  - host: "{{ HOSTNAME }}"
     http:
       paths:
-      - path: /swagger(/|$)
+      - path: /concourse(/|$)
         pathType: Prefix
         backend:
           service:
-            name: "swagger-svc"
+            name: concourse-web
             port:
-              number: 80
+              number: 8080

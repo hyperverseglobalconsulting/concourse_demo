@@ -270,6 +270,6 @@
 
     - debug:
         msg:
-          - "Concourse Web UI credentials - Username: {{ concourse_username.stdout }}, Password: {{ concourse_password.stdout }}"
+          - "Concourse Web UI credentials - Username: test, Password: test"
           - "Concourse Web Service: {{ service_status.stdout }}"
 
