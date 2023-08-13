@@ -1,0 +1,15 @@
+- name: Create Persistent Volume Claims for Concourse
+  k8s:
+    definition:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: concourse-pvc-{{ item }}
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 30Gi
+  with_sequence: start=0 end=2

@@ -8,6 +8,7 @@
     aws_secret_access_key: "{{ AWS_SECRET_ACCESS_KEY }}"
     aws_region: "{{ AWS_REGION }}"
     key_name: "{{KEY_NAME}}"
+    ebs_volume_ids: "{{ EBS_VOLUME_IDS.split(',') }}"
 
   tasks:
     - name: Install required packages
@@ -159,20 +160,105 @@
         cmd: helm install ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx
       become: no
 
+    - name: Get the ELB name associated with ingress-nginx
+      command: kubectl get svc -n ingress-nginx ingress-nginx-controller -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+      become_user: ec2-user
+      register: elb_hostname_result
+      until: elb_hostname_result.stdout != ""
+      retries: 30 # retry up to 30 times
+      delay: 10   # wait 10 seconds between each retry
+      become: no
+
+#    - name: Create Persistent Volume for Concourse
+#      template:
+#        src: ~/concourse_demo/terraform/concourse-pv.yaml.template
+#        dest: "/tmp/concourse-{{ volume_name }}-pv.yaml"
+#        mode: '0644'
+#      loop:
+#        - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+#        - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+#        - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
+#      loop_control:
+#        loop_var: item
+#      vars:
+#        volume_name: "{{ item.volume_name }}"
+#        storage_size: "{{ item.storage_size }}"
+#        volume_id: "{{ item.volume_id }}"
+
+    - name: Create Persistent Volumes for Concourse
+      block:
+        - name: Render PV Template
+          template:
+            src: ~/concourse_demo/terraform/concourse-pv.yaml.template
+            dest: "/tmp/concourse-{{ item.volume_name }}-pv.yaml"
+          loop:
+            - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+            - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+            - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
+          register: pv_files
+
+        - name: Apply Persistent Volumes
+          k8s:
+            definition: "{{ lookup('file', item.item.dest) }}"
+          loop: "{{ pv_files.results }}"
+
+#    - name: Create Persistent Volume Claims for Concourse
+#      k8s:
+#        src: ~/concourse_demo/terraform/concourse-pvc.yaml.template
+#        definition:
+#            pvc_name: "concourse-pvc-{{ item }}"
+#      with_sequence: start=0 end=2
+
+    - name: Create Persistent Volume Claims for Concourse
+      block:
+        - name: Render PVC template
+          template:
+            src: ~/concourse_demo/terraform/concourse-pvc.yaml.template
+            dest: "/tmp/concourse-pvc-{{ item }}.yaml"
+          with_sequence: start=0 end=2
+          register: pvc_files
+
+        - name: Apply Persistent Volume Claims
+          k8s:
+            definition: "{{ lookup('file', item.item.dest) }}"
+          loop: "{{ pvc_files.results }}"
+
     - name: Add Concourse Helm Chart Repository
       command:
         cmd: helm repo add concourse https://concourse-charts.storage.googleapis.com/
       register: helm_repo
-#      changed_when: "'concourse has been added' in helm_repo.stdout"
       become: no
 
     - name: Update Helm repositories
       command: helm repo update
       become: no
 
-    - name: Install Concourse using Helm
-      command: helm install concourse concourse/concourse
-#      changed_when: false
+#    - name: Install Concourse using Helm
+#      command: helm install concourse concourse/concourse
+#      become: no
+
+    - name: Write values.yaml for Concourse
+      copy:
+        dest: /tmp/values.yaml
+        content: |
+          concourse:
+            web:
+              externalUrl: "http://{{ elb_hostname_result.stdout }}/"
+        worker:
+          persistence:
+            enabled: true
+            workerPVC:
+              - concourse-pvc-0
+              - concourse-pvc-1
+        postgresql:
+          persistence:
+            enabled: true
+            existingClaim: concourse-pvc-2
+      become: no
+
+    - name: Install Concourse using Helm with custom values
+      command:
+        cmd: helm install concourse concourse/concourse -f /tmp/values.yaml
       become: no
 
 #    - name: Get Concourse Web credentials
@@ -246,13 +332,6 @@
         depth: 1 # Shallow clone, gets only the latest revision
       become: no
 
-    - name: Get the ELB name associated with ingress-nginx
-      command: kubectl get svc -n ingress-nginx ingress-nginx-controller -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-      become_user: ec2-user
-      register: elb_hostname_result
-      ignore_errors: true
-      become: no
-
 #    - name: Generate Ingress YAML from template
 #      template:
 #        src: ~/concourse_demo/api-routes/ingress.yaml.template
@@ -287,4 +366,5 @@
         msg:
           - "Concourse Web UI credentials - Username: test, Password: test"
           - "Concourse Web Service: {{ service_status.stdout }}"
+          - "Load Balancer DNS Name: {{ elb_hostname_result.stdout }}"
 
