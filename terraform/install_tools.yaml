@@ -193,66 +193,86 @@
         depth: 1 # Shallow clone, gets only the latest revision
       become: no
 
-    - name: Create Persistent Volumes and PVCs for Concourse
+    # Handle Persistent Volume Claims
+    - name: Copy PVC template file
+      command: cp ~/concourse_demo/terraform/concourse-pvc.yaml.template /tmp/concourse-pvc-{{ item }}.yaml
+      with_sequence: start=0 end=2
       become: no
+
+    - name: Substitute PVC_ID placeholder in PVC
+      replace:
+        path: "/tmp/concourse-pvc-{{ item }}.yaml"
+        regexp: 'PVC_ID'
+        replace: "{{ item }}"
+      with_sequence: start=0 end=2
+      become: no
+
+    - name: Apply Persistent Volume Claims
+      k8s:
+        src: "/tmp/concourse-pvc-{{ item }}.yaml"
+      with_sequence: start=0 end=2
+      become: no
+
+#        # Handle Persistent Volume Claims
+#        - name: Rename PVC template file
+#          command: cp ~/concourse_demo/terraform/concourse-pvc.yaml.template /tmp/concourse-pvc-{{ item }}.yaml
+#          with_sequence: start=0 end=2
+#
+#        - name: Apply Persistent Volume Claims
+#          k8s:
+#            src: "/tmp/concourse-pvc-{{ item }}.yaml"
+#          with_sequence: start=0 end=2
+
+    # Handle Persistent Volumes
+    - name: Rename PV template file
+      command: cp ~/concourse_demo/terraform/concourse-pv.yaml.template /tmp/concourse-pv-{{ item.volume_name }}.yaml
+      with_items:
+        - { volume_name: 'postgres' }
+        - { volume_name: 'worker0' }
+        - { volume_name: 'worker1' }
+      become: no
+
+    - name: Substitute values in PV templates
       block:
-        # Handle Persistent Volume Claims
-        - name: Rename PVC template file
-          command: mv ~/concourse_demo/terraform/concourse-pvc.yaml.template /tmp/concourse-pvc-{{ item }}.yaml
-          with_sequence: start=0 end=2
-
-        - name: Apply Persistent Volume Claims
-          k8s:
-            src: "/tmp/concourse-pvc-{{ item }}.yaml"
-          with_sequence: start=0 end=2
-
-        # Handle Persistent Volumes
-        - name: Rename PV template file
-          command: mv ~/concourse_demo/terraform/concourse-pv.yaml.template /tmp/concourse-pv-{{ item.volume_name }}.yaml
+        - name: Substitute volume_name
+          replace:
+            path: /tmp/concourse-pv-{{ item.volume_name }}.yaml
+            regexp: "VOLUME_NAME_PLACEHOLDER"
+            replace: "{{ item.volume_name }}"
           with_items:
-            - { volume_name: 'postgres' }
-            - { volume_name: 'worker0' }
-            - { volume_name: 'worker1' }
+            - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+            - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+            - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
 
-        - name: Substitute values in PV templates
-          block:
-            - name: Substitute volume_name
-              replace:
-                path: /tmp/concourse-pv-{{ item.volume_name }}.yaml
-                regexp: "VOLUME_NAME_PLACEHOLDER"
-                replace: "{{ item.volume_name }}"
-              with_items:
-                - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
-                - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
-                - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
-
-            - name: Substitute volume_id
-              replace:
-                path: /tmp/concourse-pv-{{ item.volume_name }}.yaml
-                regexp: "VOLUME_ID_PLACEHOLDER"
-                replace: "{{ item.volume_id }}"
-              with_items:
-                - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
-                - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
-                - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
-
-            - name: Substitute storage_size
-              replace:
-                path: /tmp/concourse-pv-{{ item.volume_name }}.yaml
-                regexp: "STORAGE_SIZE_PLACEHOLDER"
-                replace: "{{ item.storage_size }}"
-              with_items:
-                - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
-                - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
-                - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
-
-        - name: Apply Persistent Volumes
-          k8s:
-            src: "/tmp/concourse-pv-{{ item.volume_name }}.yaml"
+        - name: Substitute volume_id
+          replace:
+            path: /tmp/concourse-pv-{{ item.volume_name }}.yaml
+            regexp: "VOLUME_ID_PLACEHOLDER"
+            replace: "{{ item.volume_id }}"
           with_items:
-            - { volume_name: 'postgres' }
-            - { volume_name: 'worker0' }
-            - { volume_name: 'worker1' }
+            - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+            - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+            - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
+
+        - name: Substitute storage_size
+          replace:
+            path: /tmp/concourse-pv-{{ item.volume_name }}.yaml
+            regexp: "STORAGE_SIZE_PLACEHOLDER"
+            replace: "{{ item.storage_size }}"
+          with_items:
+            - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+            - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+            - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
+      become: no
+
+    - name: Apply Persistent Volumes
+      k8s:
+        src: "/tmp/concourse-pv-{{ item.volume_name }}.yaml"
+      with_items:
+        - { volume_name: 'postgres' }
+        - { volume_name: 'worker0' }
+        - { volume_name: 'worker1' }
+      become: no
 
 
 #    - name: Create Persistent Volumes for Concourse

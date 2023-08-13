@@ -6,3 +6,4 @@ django-cors-headers==4.0.0
 requests==2.26.0
 django-extensions==3.2.1
 psycopg2-binary==2.9.3
+kubernetes
