@@ -1,22 +1,13 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  annotations:
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-  labels:
-    app.kubernetes.io/instance: "demo-concourse"
-    app.kubernetes.io/name: "demo-concourse"
-    app.kubernetes.io/version: "demo-concourse-v1.0.0"
-  name: "demo-ingress"
+  name: concourse-web-ingress
 spec:
   rules:
   - host: "{{ HOSTNAME }}"
     http:
       paths:
-      - path: /concourse(/|$)
+      - path: /
         pathType: Prefix
         backend:
           service:

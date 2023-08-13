@@ -253,12 +253,27 @@
       ignore_errors: true
       become: no
 
+#    - name: Generate Ingress YAML from template
+#      template:
+#        src: ~/concourse_demo/api-routes/ingress.yaml.template
+#        dest: ~/concourse_demo/api-routes/ingress.yaml
+#      vars:
+#        HOSTNAME: "{{ elb_hostname_result.stdout }}"
+#      when: elb_hostname_result.stdout != ""
+#      become: no
+
     - name: Generate Ingress YAML from template
-      template:
-        src: ~/concourse_demo/api-routes/ingress.yaml.template
-        dest: ~/concourse_demo/api-routes/ingress.yaml
-      vars:
-        HOSTNAME: "{{ elb_hostname_result.stdout }}"
+      command:
+        cmd: "cat ~/concourse_demo/api-routes/ingress.yaml.template"
+      register: template_content
+      changed_when: false
+      when: elb_hostname_result.stdout != ""
+      become: no
+
+    - name: Replace HOSTNAME in template
+      copy:
+        dest: "~/concourse_demo/api-routes/ingress.yaml"
+        content: "{{ template_content.stdout | replace('{{ HOSTNAME }}', elb_hostname_result.stdout) }}"
       when: elb_hostname_result.stdout != ""
       become: no
 
