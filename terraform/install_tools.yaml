@@ -185,22 +185,93 @@
 #        storage_size: "{{ item.storage_size }}"
 #        volume_id: "{{ item.volume_id }}"
 
-    - name: Create Persistent Volumes for Concourse
+    - name: Clone specific branch of the repository
+      git:
+        repo: 'https://github.com/hyperverseglobalconsulting/concourse_demo.git'
+        dest: '~/concourse_demo'
+        version: main
+        depth: 1 # Shallow clone, gets only the latest revision
+      become: no
+
+    - name: Create Persistent Volumes and PVCs for Concourse
+      become: no
       block:
-        - name: Render PV Template
-          template:
-            src: ~/concourse_demo/terraform/concourse-pv.yaml.template
-            dest: "/tmp/concourse-{{ item.volume_name }}-pv.yaml"
-          loop:
-            - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
-            - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
-            - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
-          register: pv_files
+        # Handle Persistent Volume Claims
+        - name: Rename PVC template file
+          command: mv ~/concourse_demo/terraform/concourse-pvc.yaml.template /tmp/concourse-pvc-{{ item }}.yaml
+          with_sequence: start=0 end=2
+
+        - name: Apply Persistent Volume Claims
+          k8s:
+            src: "/tmp/concourse-pvc-{{ item }}.yaml"
+          with_sequence: start=0 end=2
+
+        # Handle Persistent Volumes
+        - name: Rename PV template file
+          command: mv ~/concourse_demo/terraform/concourse-pv.yaml.template /tmp/concourse-pv-{{ item.volume_name }}.yaml
+          with_items:
+            - { volume_name: 'postgres' }
+            - { volume_name: 'worker0' }
+            - { volume_name: 'worker1' }
+
+        - name: Substitute values in PV templates
+          block:
+            - name: Substitute volume_name
+              replace:
+                path: /tmp/concourse-pv-{{ item.volume_name }}.yaml
+                regexp: "VOLUME_NAME_PLACEHOLDER"
+                replace: "{{ item.volume_name }}"
+              with_items:
+                - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+                - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+                - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
+
+            - name: Substitute volume_id
+              replace:
+                path: /tmp/concourse-pv-{{ item.volume_name }}.yaml
+                regexp: "VOLUME_ID_PLACEHOLDER"
+                replace: "{{ item.volume_id }}"
+              with_items:
+                - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+                - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+                - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
+
+            - name: Substitute storage_size
+              replace:
+                path: /tmp/concourse-pv-{{ item.volume_name }}.yaml
+                regexp: "STORAGE_SIZE_PLACEHOLDER"
+                replace: "{{ item.storage_size }}"
+              with_items:
+                - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+                - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+                - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
 
         - name: Apply Persistent Volumes
           k8s:
-            definition: "{{ lookup('file', item.item.dest) }}"
-          loop: "{{ pv_files.results }}"
+            src: "/tmp/concourse-pv-{{ item.volume_name }}.yaml"
+          with_items:
+            - { volume_name: 'postgres' }
+            - { volume_name: 'worker0' }
+            - { volume_name: 'worker1' }
+
+
+#    - name: Create Persistent Volumes for Concourse
+#      block:
+#        - name: Render PV Template
+#          template:
+#            src: ~/concourse_demo/terraform/concourse-pv.yaml.template
+#            dest: "/tmp/concourse-{{ item.volume_name }}-pv.yaml"
+#          loop:
+#            - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+#            - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+#            - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
+#          register: pv_files
+#
+#        - name: Apply Persistent Volumes
+#          k8s:
+#            definition: "{{ lookup('file', item.item.dest) }}"
+#          loop: "{{ pv_files.results }}"
+#      become: no
 
 #    - name: Create Persistent Volume Claims for Concourse
 #      k8s:
@@ -209,19 +280,20 @@
 #            pvc_name: "concourse-pvc-{{ item }}"
 #      with_sequence: start=0 end=2
 
-    - name: Create Persistent Volume Claims for Concourse
-      block:
-        - name: Render PVC template
-          template:
-            src: ~/concourse_demo/terraform/concourse-pvc.yaml.template
-            dest: "/tmp/concourse-pvc-{{ item }}.yaml"
-          with_sequence: start=0 end=2
-          register: pvc_files
-
-        - name: Apply Persistent Volume Claims
-          k8s:
-            definition: "{{ lookup('file', item.item.dest) }}"
-          loop: "{{ pvc_files.results }}"
+#    - name: Create Persistent Volume Claims for Concourse
+#      block:
+#        - name: Render PVC template
+#          template:
+#            src: ~/concourse_demo/terraform/concourse-pvc.yaml.template
+#            dest: "/tmp/concourse-pvc-{{ item }}.yaml"
+#          with_sequence: start=0 end=2
+#          register: pvc_files
+#
+#        - name: Apply Persistent Volume Claims
+#          k8s:
+#            definition: "{{ lookup('file', item.item.dest) }}"
+#          loop: "{{ pvc_files.results }}"
+#      become: no
 
     - name: Add Concourse Helm Chart Repository
       command:
@@ -322,14 +394,6 @@
       shell: "kubectl port-forward -n default {{ concourse_pod.stdout }} 8080:8080 &"
       async: 10
       poll: 0
-      become: no
-
-    - name: Clone specific branch of the repository
-      git:
-        repo: 'https://github.com/hyperverseglobalconsulting/concourse_demo.git'
-        dest: '~/concourse_demo'
-        version: main
-        depth: 1 # Shallow clone, gets only the latest revision
       become: no
 
 #    - name: Generate Ingress YAML from template
