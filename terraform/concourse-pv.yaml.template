@@ -10,7 +10,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: standard
+  storageClassName: gp2 # Aligning with AWS provisioner
   awsElasticBlockStore:
     volumeID: VOLUME_ID_PLACEHOLDER
     fsType: ext4

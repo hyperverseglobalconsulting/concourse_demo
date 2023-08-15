@@ -3,10 +3,12 @@ kind: PersistentVolumeClaim
 metadata:
   name: concourse-pvc-PVC_ID
   namespace: default
+  labels:
+    app-volume: "concourse" # Label to match the selector in Concourse configuration
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: standard
+  storageClassName: gp2 # Using the default provisioner for AWS
   resources:
     requests:
       storage: 20Gi

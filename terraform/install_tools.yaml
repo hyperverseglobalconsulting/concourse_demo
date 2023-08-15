@@ -193,25 +193,25 @@
         depth: 1 # Shallow clone, gets only the latest revision
       become: no
 
-    # Handle Persistent Volume Claims
-    - name: Copy PVC template file
-      command: cp ~/concourse_demo/terraform/concourse-pvc.yaml.template /tmp/concourse-pvc-{{ item }}.yaml
-      with_sequence: start=0 end=2
-      become: no
-
-    - name: Substitute PVC_ID placeholder in PVC
-      replace:
-        path: "/tmp/concourse-pvc-{{ item }}.yaml"
-        regexp: 'PVC_ID'
-        replace: "{{ item }}"
-      with_sequence: start=0 end=2
-      become: no
-
-    - name: Apply Persistent Volume Claims
-      k8s:
-        src: "/tmp/concourse-pvc-{{ item }}.yaml"
-      with_sequence: start=0 end=2
-      become: no
+#    # Handle Persistent Volume Claims
+#    - name: Copy PVC template file
+#      command: cp ~/concourse_demo/terraform/concourse-pvc.yaml.template /tmp/concourse-pvc-{{ item }}.yaml
+#      with_sequence: start=0 end=2
+#      become: no
+#
+#    - name: Substitute PVC_ID placeholder in PVC
+#      replace:
+#        path: "/tmp/concourse-pvc-{{ item }}.yaml"
+#        regexp: 'PVC_ID'
+#        replace: "{{ item }}"
+#      with_sequence: start=0 end=2
+#      become: no
+#
+#    - name: Apply Persistent Volume Claims
+#      k8s:
+#        src: "/tmp/concourse-pvc-{{ item }}.yaml"
+#      with_sequence: start=0 end=2
+#      become: no
 
 #        # Handle Persistent Volume Claims
 #        - name: Rename PVC template file
@@ -275,45 +275,45 @@
       become: no
 
 
-#    - name: Create Persistent Volumes for Concourse
-#      block:
-#        - name: Render PV Template
-#          template:
-#            src: ~/concourse_demo/terraform/concourse-pv.yaml.template
-#            dest: "/tmp/concourse-{{ item.volume_name }}-pv.yaml"
-#          loop:
-#            - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
-#            - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
-#            - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
-#          register: pv_files
+##    - name: Create Persistent Volumes for Concourse
+##      block:
+##        - name: Render PV Template
+##          template:
+##            src: ~/concourse_demo/terraform/concourse-pv.yaml.template
+##            dest: "/tmp/concourse-{{ item.volume_name }}-pv.yaml"
+##          loop:
+##            - { volume_name: 'postgres', volume_id: "{{ ebs_volume_ids[0] }}", storage_size: '20Gi' }
+##            - { volume_name: 'worker0', volume_id: "{{ ebs_volume_ids[1] }}", storage_size: '20Gi' }
+##            - { volume_name: 'worker1', volume_id: "{{ ebs_volume_ids[2] }}", storage_size: '20Gi' }
+##          register: pv_files
+##
+##        - name: Apply Persistent Volumes
+##          k8s:
+##            definition: "{{ lookup('file', item.item.dest) }}"
+##          loop: "{{ pv_files.results }}"
+##      become: no
 #
-#        - name: Apply Persistent Volumes
-#          k8s:
-#            definition: "{{ lookup('file', item.item.dest) }}"
-#          loop: "{{ pv_files.results }}"
-#      become: no
-
-#    - name: Create Persistent Volume Claims for Concourse
-#      k8s:
-#        src: ~/concourse_demo/terraform/concourse-pvc.yaml.template
-#        definition:
-#            pvc_name: "concourse-pvc-{{ item }}"
-#      with_sequence: start=0 end=2
-
-#    - name: Create Persistent Volume Claims for Concourse
-#      block:
-#        - name: Render PVC template
-#          template:
-#            src: ~/concourse_demo/terraform/concourse-pvc.yaml.template
-#            dest: "/tmp/concourse-pvc-{{ item }}.yaml"
-#          with_sequence: start=0 end=2
-#          register: pvc_files
+##    - name: Create Persistent Volume Claims for Concourse
+##      k8s:
+##        src: ~/concourse_demo/terraform/concourse-pvc.yaml.template
+##        definition:
+##            pvc_name: "concourse-pvc-{{ item }}"
+##      with_sequence: start=0 end=2
 #
-#        - name: Apply Persistent Volume Claims
-#          k8s:
-#            definition: "{{ lookup('file', item.item.dest) }}"
-#          loop: "{{ pvc_files.results }}"
-#      become: no
+##    - name: Create Persistent Volume Claims for Concourse
+##      block:
+##        - name: Render PVC template
+##          template:
+##            src: ~/concourse_demo/terraform/concourse-pvc.yaml.template
+##            dest: "/tmp/concourse-pvc-{{ item }}.yaml"
+##          with_sequence: start=0 end=2
+##          register: pvc_files
+##
+##        - name: Apply Persistent Volume Claims
+##          k8s:
+##            definition: "{{ lookup('file', item.item.dest) }}"
+##          loop: "{{ pvc_files.results }}"
+##      become: no
 
     - name: Add Concourse Helm Chart Repository
       command:
@@ -336,16 +336,26 @@
           concourse:
             web:
               externalUrl: "http://{{ elb_hostname_result.stdout }}/"
-        worker:
-          persistence:
-            enabled: true
-            workerPVC:
-              - concourse-pvc-0
-              - concourse-pvc-1
-        postgresql:
-          persistence:
-            enabled: true
-            existingClaim: concourse-pvc-2
+            worker:
+              enabled: true
+              persistence:
+                storageClass: gp2 # Choosing the default provisioner (gp2 on AWS)
+                # You can define additional selector for pvc
+                selector:
+                  matchLabels:
+                    app-volume: "concourse" # Uncomment and adjust as needed
+                # Add labels to worker volumeClaimTemplate
+                labels: {} # Add specific labels if needed
+              # Additional worker configuration can be added here as needed
+            postgresql:
+              enabled: true
+              primary:
+                persistence:
+                  enabled: true
+                  storageClass: gp2 # Choosing the default provisioner (gp2 on AWS)
+                  accessModes:
+                    - ReadWriteOnce
+                  size: "20Gi"
       become: no
 
     - name: Install Concourse using Helm with custom values
