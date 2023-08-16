@@ -2,6 +2,21 @@
 
 # Script name: destroy_infrastructure.sh
 
+# Find the PID of the SSH tunnel
+PID=$(ps aux | grep "ssh -i concourse-k8s.pem -L 8080:localhost:8080" | grep -v "grep" | awk '{print $2}')
+
+# If PID is not empty, then kill the process
+if [ ! -z "$PID" ]; then
+    kill $PID
+    if [ $? -eq 0 ]; then
+        echo "Successfully killed the SSH tunnel process with PID: $PID"
+    else
+        echo "Error killing process with PID: $PID"
+    fi
+else
+    echo "SSH tunnel process not found. Nothing to kill."
+fi
+
 # Run the Ansible playbook to uninstall ingress-nginx
 BASTION_HOST=$(terraform output -raw bastion_public_ip)
 VPC_ID=$(terraform output -raw vpc_id)

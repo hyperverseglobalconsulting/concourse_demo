@@ -1,0 +1,30 @@
+concourse:
+  persistence:
+    enabled: true
+    worker:
+      size: "20Gi"
+  web:
+    externalUrl: "http://{{ elb_hostname_result.stdout }}/"
+  worker:
+    enabled: true
+    persistence:
+      storageClass: gp2
+      # You can define additional selector for pvc
+      selector:
+        matchLabels:
+          app-volume: "concourse" # Uncomment and adjust as needed
+      # Add labels to worker volumeClaimTemplate
+      labels: {} # Add specific labels if needed
+    # Additional worker configuration can be added here as needed
+    runtime: containerd
+    logLevel: info
+    replicas: 2
+  postgresql:
+    enabled: true
+    primary:
+      persistence:
+        enabled: true
+        storageClass: gp2
+        accessModes:
+          - ReadWriteOnce
+        size: "20Gi"
