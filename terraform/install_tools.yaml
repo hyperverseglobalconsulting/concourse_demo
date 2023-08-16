@@ -204,33 +204,48 @@
       command: helm repo update
       become: no
 
-    - name: Write values.yaml for Concourse
+#    - name: Write values.yaml for Concourse
+#      copy:
+#        dest: /tmp/values.yaml
+#        content: |
+#          concourse:
+#            web:
+#              externalUrl: "http://{{ elb_hostname_result.stdout }}/"
+#            worker:
+#              enabled: true
+#              persistence:
+#                storageClass: gp2
+#                # You can define additional selector for pvc
+#                selector:
+#                  matchLabels:
+#                    app-volume: "concourse" # Uncomment and adjust as needed
+#                # Add labels to worker volumeClaimTemplate
+#                labels: {} # Add specific labels if needed
+#              # Additional worker configuration can be added here as needed
+#            postgresql:
+#              enabled: true
+#              primary:
+#                persistence:
+#                  enabled: true
+#                  storageClass: gp2
+#                  accessModes:
+#                    - ReadWriteOnce
+#                  size: "20Gi"
+#      become: no
+
+    - name: Generate Concourse Helm Values YAML from template
+      command:
+        cmd: "cat ~/concourse_demo/terraform/concourse-values.yaml.template"
+      register: values_template_content
+      changed_when: false
+      when: elb_hostname_result.stdout != ""
+      become: no
+
+    - name: Replace HOSTNAME in template
       copy:
         dest: /tmp/values.yaml
-        content: |
-          concourse:
-            web:
-              externalUrl: "http://{{ elb_hostname_result.stdout }}/"
-            worker:
-              enabled: true
-              persistence:
-                storageClass: gp2
-                # You can define additional selector for pvc
-                selector:
-                  matchLabels:
-                    app-volume: "concourse" # Uncomment and adjust as needed
-                # Add labels to worker volumeClaimTemplate
-                labels: {} # Add specific labels if needed
-              # Additional worker configuration can be added here as needed
-            postgresql:
-              enabled: true
-              primary:
-                persistence:
-                  enabled: true
-                  storageClass: gp2
-                  accessModes:
-                    - ReadWriteOnce
-                  size: "20Gi"
+        content: "{{ values_template_content.stdout | replace('{{ ELB_HOSTNAME }}', elb_hostname_result.stdout) }}"
+      when: elb_hostname_result.stdout != ""
       become: no
 
     - name: Install Concourse using Helm with custom values
