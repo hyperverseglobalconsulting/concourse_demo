@@ -4,7 +4,8 @@ concourse:
     worker:
       size: "20Gi"
   web:
-    externalUrl: "http://{{ ELB_HOSTNAME }}/"
+#    externalUrl: "http://{{ ELB_HOSTNAME }}/"
+    externalUrl: "http://localhost:8080/"
   worker:
     enabled: true
     persistence:

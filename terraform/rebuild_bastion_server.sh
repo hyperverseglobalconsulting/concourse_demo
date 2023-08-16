@@ -1,10 +1,21 @@
 #!/bin/bash
 
-# Script name: destroy_infrastructure.sh
+# Script name: rebuild_bastion_server.sh
 
-# Retrieve AWS credentials from aws configure
-#AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id)
-#AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
+# Find the PID of the SSH tunnel
+PID=$(ps aux | grep "ssh -i concourse-k8s.pem -L 8080:localhost:8080" | grep -v "grep" | awk '{print $2}')
+
+# If PID is not empty, then kill the process
+if [ ! -z "$PID" ]; then
+    kill $PID
+    if [ $? -eq 0 ]; then
+        echo "Successfully killed the SSH tunnel process with PID: $PID"
+    else
+        echo "Error killing process with PID: $PID"
+    fi
+else
+    echo "SSH tunnel process not found. Nothing to kill."
+fi
 
 # Run the Ansible playbook to uninstall ingress-nginx
 BASTION_IP=$(terraform output -raw bastion_public_ip)
