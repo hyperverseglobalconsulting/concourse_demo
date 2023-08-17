@@ -152,17 +152,25 @@
         state: latest
       become: yes
 
-    - name: Copy files to remote server's /tmp directory
-      copy:
-        src: "{{ item }}"
-        dest: "/tmp/{{ item }}"
-      with_items:
-        - requirements.txt
+    - name: Clone specific branch of the repository
+      git:
+        repo: 'https://github.com/hyperverseglobalconsulting/concourse_demo.git'
+        dest: '~/concourse_demo'
+        version: main
+        depth: 1 # Shallow clone, gets only the latest revision
       become: no
 
+#    - name: Copy files to remote server's /tmp directory
+#      copy:
+#        src: "{{ item }}"
+#        dest: "/tmp/{{ item }}"
+#      with_items:
+#        - requirements.txt
+#      become: no
+#
     - name: Install Python packages from requirements.txt
       pip:
-        requirements: /tmp/requirements.txt
+        requirements: ~/concourse_demo/terraform/requirements.txt
         executable: pip3
       become: no
 
@@ -186,14 +194,6 @@
       delay: 10   # wait 10 seconds between each retry
       become: no
 
-    - name: Clone specific branch of the repository
-      git:
-        repo: 'https://github.com/hyperverseglobalconsulting/concourse_demo.git'
-        dest: '~/concourse_demo'
-        version: main
-        depth: 1 # Shallow clone, gets only the latest revision
-      become: no
-
     - name: Add Concourse Helm Chart Repository
       command:
         cmd: helm repo add concourse https://concourse-charts.storage.googleapis.com/
@@ -203,35 +203,6 @@
     - name: Update Helm repositories
       command: helm repo update
       become: no
-
-#    - name: Write values.yaml for Concourse
-#      copy:
-#        dest: /tmp/values.yaml
-#        content: |
-#          concourse:
-#            web:
-#              externalUrl: "http://{{ elb_hostname_result.stdout }}/"
-#            worker:
-#              enabled: true
-#              persistence:
-#                storageClass: gp2
-#                # You can define additional selector for pvc
-#                selector:
-#                  matchLabels:
-#                    app-volume: "concourse" # Uncomment and adjust as needed
-#                # Add labels to worker volumeClaimTemplate
-#                labels: {} # Add specific labels if needed
-#              # Additional worker configuration can be added here as needed
-#            postgresql:
-#              enabled: true
-#              primary:
-#                persistence:
-#                  enabled: true
-#                  storageClass: gp2
-#                  accessModes:
-#                    - ReadWriteOnce
-#                  size: "20Gi"
-#      become: no
 
     - name: Generate Concourse Helm Values YAML from template
       command:
@@ -303,31 +274,31 @@
         mode: '0755'
       when: concourse_version is defined
 
-    - name: Get Concourse web pod name
-      shell: kubectl get pods -n default -l app=concourse-web -o jsonpath='{.items[0].metadata.name}'
-      register: concourse_pod
-      changed_when: false
-      become: no
-
-    - name: Wait for concourse-web pod to be running
-      command: >
-        kubectl get pod -n default {{ concourse_pod.stdout }} -o=jsonpath='{.status.phase}'
-      register: pod_status
-      until: pod_status.stdout == "Running"
-      retries: 30  # Number of retries before giving up
-      delay: 10   # Delay in seconds between retries
-      become: no
-
-    # kubectl port-forward setup (from bastion to Concourse pod)
-    - name: Start port forwarding (Bastion to Concourse)
-      command: >
-        screen -dmS kubectl_forward
-        kubectl port-forward -n default {{ concourse_pod.stdout }} 8080:8080
-      register: port_forward_output
-      become: no
-
-    - debug:
-        var: port_forward_output
+#    - name: Get Concourse web pod name
+#      shell: kubectl get pods -n default -l app=concourse-web -o jsonpath='{.items[0].metadata.name}'
+#      register: concourse_pod
+#      changed_when: false
+#      become: no
+#
+#    - name: Wait for concourse-web pod to be running
+#      command: >
+#        kubectl get pod -n default {{ concourse_pod.stdout }} -o=jsonpath='{.status.phase}'
+#      register: pod_status
+#      until: pod_status.stdout == "Running"
+#      retries: 30  # Number of retries before giving up
+#      delay: 10   # Delay in seconds between retries
+#      become: no
+#
+#    # kubectl port-forward setup (from bastion to Concourse pod)
+#    - name: Start port forwarding (Bastion to Concourse)
+#      command: >
+#        screen -dmS kubectl_forward
+#        kubectl port-forward -n default {{ concourse_pod.stdout }} 8080:8080
+#      register: port_forward_output
+#      become: no
+#
+#    - debug:
+#        var: port_forward_output
 
     - name: Generate Ingress YAML from template
       command:
