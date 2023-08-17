@@ -148,8 +148,7 @@ resource "aws_instance" "bastion" {
                 --extra-vars "AWS_ACCESS_KEY_ID='$AWS_ACCESS_KEY_ID'" \
                 --extra-vars "AWS_SECRET_ACCESS_KEY='$AWS_SECRET_ACCESS_KEY'" \
                 --extra-vars "AWS_REGION='$AWS_DEFAULT_REGION'" \
-                --extra-vars "KEY_NAME='${var.key_name}'" \
-                --extra-vars "EBS_VOLUME_IDS='${join(",", aws_ebs_volume.concourse_volumes[*].id)}'"
+                --extra-vars "KEY_NAME='${var.key_name}'"
                 unset AWS_ACCESS_KEY_ID
                 unset AWS_SECRET_ACCESS_KEY
                 unset AWS_DEFAULT_REGION
@@ -162,8 +161,7 @@ resource "aws_instance" "bastion" {
 
   depends_on = [
         null_resource.change_key_permissions,
-        aws_eks_cluster.cluster,
-        aws_ebs_volume.concourse_volumes
+        aws_eks_cluster.cluster
   ]
 
 }

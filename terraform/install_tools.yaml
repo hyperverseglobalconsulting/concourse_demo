@@ -8,7 +8,6 @@
     aws_secret_access_key: "{{ AWS_SECRET_ACCESS_KEY }}"
     aws_region: "{{ AWS_REGION }}"
     key_name: "{{KEY_NAME}}"
-    ebs_volume_ids: "{{ EBS_VOLUME_IDS.split(',') }}"
 
   tasks:
     - name: Install required packages
