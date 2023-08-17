@@ -27,7 +27,7 @@ Once Terraform has finished provisioning the resources, get the public IP of the
 `terraform output bastion_public_ip`
 
 - #### Accessing Key Pair
-Terraform script will create a key pair and save the private key as `mongodb-in-eks.pem` in the current directory. Ensure you keep this key secure.
+Terraform script will create a key pair and save the private key as `concourse-k8s.pem` in the current directory. Ensure you keep this key secure.
 
 ### 2. Accessing Concourse Web
 Access to the Concourse web interface is facilitated through the Class Load Balancer. Its URL is printed by the Ansible Notebook executed by the `terraform apply` command.
