@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: sample-gateway
+  name: concourse-web-gateway
   namespace: istio-ingress
 spec:
   selector:

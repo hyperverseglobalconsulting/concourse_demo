@@ -2,6 +2,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
   name: concourse-web-virtualservice
+  namespace: cicd
 spec:
   hosts:
   - "{{ HOSTNAME }}"
@@ -13,7 +14,7 @@ spec:
         prefix: /
     route:
     - destination:
-        host: concourse-web.default.svc.cluster.local  # Assuming `concourse-web` service is in the default namespace
+        host: concourse-web.cicd.svc.cluster.local  # Corrected to point to the service in the `cicd` namespace
         port:
           number: 8080
 

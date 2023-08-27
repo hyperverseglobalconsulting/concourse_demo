@@ -2,6 +2,10 @@
 
 # Script name: destroy_infrastructure.sh
 
+# Ask for the sudo password
+read -s -p "Enter the sudo password: " SUDO_PASSWORD
+echo
+
 # Find the PID of the SSH tunnel
 #PID=$(ps aux | grep "ssh -i concourse-k8s.pem -L 8080:localhost:8080" | grep -v "grep" | awk '{print $2}')
 
@@ -30,5 +34,5 @@ if [ $? -ne 0 ]; then
 fi
 
 # Now, run terraform destroy if the Ansible playbook command was successful
-terraform destroy -auto-approve
+terraform destroy -auto-approve -var "sudo_password=$SUDO_PASSWORD"
 
