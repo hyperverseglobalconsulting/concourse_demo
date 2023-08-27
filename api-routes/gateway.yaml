@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: sample-gateway
+  namespace: istio-ingress
+spec:
+  selector:
+    istio: ingress  # This matches the label of the istio-ingress pod.
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+

@@ -1,18 +1,53 @@
 ---
 - hosts: all
   tasks:
+    - name: List all the Istio charts installed in istio-system namespace
+      command: helm ls -n istio-system
+      register: helm_list
+      changed_when: false
+      become: no
+
     - name: Get the ELB name associated with ingress-nginx
       command: kubectl get svc -n ingress-nginx ingress-nginx-controller -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}'
       become: yes
       become_user: ec2-user
       register: elb_hostname_result
       ignore_errors: true
+      become: no
 
-    - name: Uninstall ingress-nginx Helm release
-      command: helm uninstall ingress-nginx -n ingress-nginx
-      become: yes
-      become_user: ec2-user
+    - name: Display the Istio helm charts
+      debug:
+        var: helm_list.stdout_lines
+      become: no
+
+    - name: Delete Istio gateway chart installations (if they exist)
+      command: helm delete istio-ingress -n istio-ingress
       ignore_errors: true
+      become: no
+
+    - name: Delete istio-ingress namespace
+      command: kubectl delete namespace istio-ingress
+      ignore_errors: true
+      become: no
+
+    - name: Delete Istio discovery chart
+      command: helm delete istiod -n istio-system
+      become: no
+
+    - name: Delete Istio base chart
+      command: helm delete istio-base -n istio-system
+      become: no
+
+    - name: Delete istio-system namespace
+      command: kubectl delete namespace istio-system
+      become: no
+
+    # If you need to uninstall stable revision label resources, add tasks here
+
+    - name: Delete Istio CRDs
+      command: kubectl get crd -oname | grep 'istio.io' | xargs kubectl delete
+      ignore_errors: true
+      become: no
 
     - name: Uninstall ingress-nginx Helm release
       command: helm uninstall concourse concourse/concourse

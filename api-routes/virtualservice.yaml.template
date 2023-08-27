@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: concourse-web-virtualservice
+spec:
+  hosts:
+  - "{{ HOSTNAME }}"
+  gateways:
+  - istio-ingress/concourse-web-gateway  # Reference the Gateway in the `istio-ingress` namespace
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: concourse-web.default.svc.cluster.local  # Assuming `concourse-web` service is in the default namespace
+        port:
+          number: 8080
+

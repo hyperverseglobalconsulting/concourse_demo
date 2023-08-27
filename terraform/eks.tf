@@ -89,7 +89,7 @@ resource "aws_eks_node_group" "node_group" {
     min_size     = 3
   }
 
-  instance_types = ["t3.small"]
+  instance_types = ["t3.medium"]
 
   disk_size = 20
 

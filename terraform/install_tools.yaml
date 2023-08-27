@@ -85,7 +85,7 @@
 
     - name: Add ingress-nginx Helm repository
       command:
-        cmd: "helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx"
+        cmd: helm repo add istio https://istio-release.storage.googleapis.com/charts
       become: no
 
     - name: Update Helm repositories
@@ -164,24 +164,85 @@
         executable: pip3
       become: no
 
-    - name: Create ingress-nginx namespace
-      command:
-        cmd: kubectl create namespace ingress-nginx
-      ignore_errors: yes
+    - name: Create namespace istio-system
+      command: kubectl create namespace istio-system
+      ignore_errors: yes  # It's okay if the namespace already exists
       become: no
 
-    - name: Install ingress-nginx using Helm in ingress-nginx namespace
-      command:
-        cmd: helm install ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx
+    - name: Install Istio Base Chart
+      command: >
+        helm install istio-base istio/base -n istio-system --set defaultRevision=default
       become: no
 
-    - name: Get the ELB name associated with ingress-nginx
-      command: kubectl get svc -n ingress-nginx ingress-nginx-controller -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-      become_user: ec2-user
+    - name: Validate Istio Base Chart Installation
+      command: helm ls -n istio-system
+      register: helm_ls_output
+      changed_when: false
+      failed_when: "'istio-base' not in helm_ls_output.stdout"
+      become: no
+
+    - name: Install Istio Discovery Chart
+      command: >
+        helm install istiod istio/istiod -n istio-system --wait
+      become: no
+
+    - name: Validate Istio Discovery Chart Installation
+      command: helm ls -n istio-system
+      register: helm_ls_discovery_output
+      changed_when: false
+      failed_when: "'istiod' not in helm_ls_discovery_output.stdout"
+      become: no
+
+    - name: Check istiod Service and Pods
+      command: kubectl get deployments -n istio-system --output wide
+      register: istiod_check
+      changed_when: false
+      failed_when: "'istiod' not in istiod_check.stdout"
+      become: no
+
+    - name: (Optional) Create namespace istio-ingress
+      command: kubectl create namespace istio-ingress
+      ignore_errors: yes  # It's okay if the namespace already exists
+      become: no
+
+    - name: (Optional) Install Istio Ingress Gateway
+      command: >
+        helm install istio-ingress istio/gateway -n istio-ingress --wait
+      become: no
+
+    - name: Create namespace cicd
+      command: kubectl create namespace cicd
+      ignore_errors: yes  # It's okay if the namespace already exists
+      become: no
+
+    - name: Label namespace for Istio sidecar injection (Optional)
+      command: kubectl label namespace cicd istio-injection=enabled
+      vars:
+        namespace: "default" # Change this to your desired namespace
+      become: no
+
+    - name: Get Istio Ingress service details
+      command: kubectl get service istio-ingress -n istio-ingress -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}'
       register: elb_hostname_result
       until: elb_hostname_result.stdout != ""
       retries: 30 # retry up to 30 times
       delay: 10   # wait 10 seconds between each retry
+      become: no
+
+    - name: Deploy Kiali
+      command: kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.11/samples/addons/kiali.yaml
+      become: no
+
+    - name: Install Prometheus Add-on
+      command: kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.11/samples/addons/prometheus.yaml
+      become: no
+
+    - name: Install Grafana Add-on
+      command: kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.11/samples/addons/grafana.yaml
+      become: no
+
+    - name: Install Jaeger Add-on
+      command: kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.11/samples/addons/jaeger.yaml
       become: no
 
     - name: Add Concourse Helm Chart Repository
@@ -211,7 +272,7 @@
 
     - name: Install Concourse using Helm with custom values
       command:
-        cmd: helm install concourse concourse/concourse -f /tmp/values.yaml
+        cmd: helm install concourse concourse/concourse -f /tmp/values.yaml -n cicd
       become: no
 
 #    - name: Get Concourse Web credentials
@@ -227,13 +288,13 @@
 #      become: no
 
     - name: Check Concourse Web Service
-      shell: kubectl get svc | grep concourse-web
+      shell: kubectl get svc -n cicd | grep concourse-web
       register: service_status
       changed_when: false
       become: no
 
     - name: Get Concourse version from Helm
-      shell: helm list -n default -o json | jq -r '.[] | select(.name=="concourse") | .app_version'
+      shell: helm list -n cicd -o json | jq -r '.[] | select(.name=="concourse") | .app_version'
       register: concourse_version_result
       become: no
 
@@ -264,9 +325,15 @@
         mode: '0755'
       when: concourse_version is defined
 
-    - name: Generate Ingress YAML from template
+    # Assuming you want to apply this ingress after creation
+    - name: Apply the Gateway to the Kubernetes Cluster
+      command: kubectl apply -f ~/concourse_demo/api-routes/gateway.yaml
+      when: elb_hostname_result.stdout != ""
+      become: no
+
+    - name: Generate VirtualService YAML from template
       command:
-        cmd: "cat ~/concourse_demo/api-routes/ingress.yaml.template"
+        cmd: "cat ~/concourse_demo/api-routes/virtualservice.yaml.template"
       register: template_content
       changed_when: false
       when: elb_hostname_result.stdout != ""
@@ -274,14 +341,14 @@
 
     - name: Replace HOSTNAME in template
       copy:
-        dest: "~/concourse_demo/api-routes/ingress.yaml"
+        dest: "~/concourse_demo/api-routes/virtualservice.yaml"
         content: "{{ template_content.stdout | replace('{{ HOSTNAME }}', elb_hostname_result.stdout) }}"
       when: elb_hostname_result.stdout != ""
       become: no
 
     # Assuming you want to apply this ingress after creation
-    - name: Apply the Ingress to the Kubernetes Cluster
-      command: kubectl apply -f ~/concourse_demo/api-routes/ingress.yaml
+    - name: Apply the VirtualService to the Kubernetes Cluster
+      command: kubectl apply -f ~/concourse_demo/api-routes/virtualservice.yaml
       when: elb_hostname_result.stdout != ""
       become: no
 

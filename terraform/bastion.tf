@@ -1,7 +1,7 @@
-resource "aws_iam_access_key" "user_key" {
-  user = var.aws_user
-}
-
+#resource "aws_iam_access_key" "user_key" {
+#  user = var.aws_user
+#}
+#
 resource aws_vpc "k8s" {
     cidr_block = var.vpc_cidr
   enable_dns_support   = true
