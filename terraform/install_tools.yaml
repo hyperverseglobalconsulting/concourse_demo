@@ -365,7 +365,7 @@
 
     - name: Install MarkLogic using Helm
       command: >
-        helm install marklogic marklogic/marklogic --namespace marklogic -f ~/concourse_demo/services/marklogic/marklogic_.yaml
+        helm install marklogic marklogic/marklogic --namespace marklogic -f ~/concourse_demo/services/marklogic/marklogic_values.yaml
       args:
         creates: "marklogic"  # This ensures idempotency. It avoids reinstalling if 'marklogic' already exists.
 
