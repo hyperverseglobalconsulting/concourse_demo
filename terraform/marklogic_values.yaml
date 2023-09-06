@@ -1,0 +1,23 @@
+# values.yaml for MarkLogic Helm Chart
+
+# Create a single MarkLogic pod
+replicaCount: 1
+
+# Set the admin credentials secret. Leave this out or set to blank "" to use the automatically generated secret.
+auth:
+  secretName: "ml-admin-secrets" 
+
+# Configure compute resources
+resources:
+  requests:      
+    cpu: 2000m      
+    memory: 4000Mi
+  limits:
+    cpu: 2000m
+    memory: 4000Mi
+
+# Configure the persistent volume
+persistence:
+  enabled: true
+  size: 20Gi
+

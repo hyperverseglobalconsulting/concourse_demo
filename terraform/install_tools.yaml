@@ -8,6 +8,7 @@
     aws_secret_access_key: "{{ AWS_SECRET_ACCESS_KEY }}"
     aws_region: "{{ AWS_REGION }}"
     key_name: "{{KEY_NAME}}"
+    values_file_path: "marklogic_values.yaml"
 
   tasks:
     - name: Install required packages
@@ -351,6 +352,23 @@
       command: kubectl apply -f ~/concourse_demo/api-routes/virtualservice.yaml
       when: elb_hostname_result.stdout != ""
       become: no
+
+    - name: Add the MarkLogic Helm Repository
+      command: helm repo add marklogic https://marklogic.github.io/marklogic-kubernetes/
+
+    - name: Update Helm Repositories
+      command: helm repo update
+
+    - name: Create a Namespace for MarkLogic
+      command: kubectl create namespace marklogic
+      ignore_errors: true  # To ignore the error if the namespace already exists.
+
+    - name: Install MarkLogic using Helm
+      command: >
+        helm install marklogic marklogic/marklogic --namespace marklogic
+        -f {{ values_file_path }}
+      args:
+        creates: "marklogic"  # This ensures idempotency. It avoids reinstalling if 'marklogic' already exists.
 
     - debug:
         msg:
