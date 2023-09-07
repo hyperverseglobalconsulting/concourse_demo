@@ -5,17 +5,26 @@ concourse:
       size: "20Gi"
   web:
     externalUrl: "http://{{ ELB_HOSTNAME }}/"
+    service:
+      ports:
+        http-atc: 8080
+    ingress:
+      rulesOverride:
+        - host: "{{ ELB_HOSTNAME }}"
+          http:
+            paths:
+              - path: '/*'
+                backend:
+                  serviceName: "concourse-web"
+                  servicePort: http-atc
   worker:
     enabled: true
     persistence:
       storageClass: gp2
-      # You can define additional selector for pvc
       selector:
         matchLabels:
-          app-volume: "concourse" # Uncomment and adjust as needed
-      # Add labels to worker volumeClaimTemplate
-      labels: {} # Add specific labels if needed
-    # Additional worker configuration can be added here as needed
+          app-volume: "concourse"
+      labels: {}
     runtime: containerd
     logLevel: info
     replicas: 2
@@ -28,3 +37,4 @@ concourse:
         accessModes:
           - ReadWriteOnce
         size: "20Gi"
+

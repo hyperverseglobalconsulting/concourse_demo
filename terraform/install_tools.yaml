@@ -112,6 +112,13 @@
         AWS_DEFAULT_REGION: "{{ aws_region }}"
       become: no
 
+    - name: Fetch kubeconfig from remote
+      fetch:
+        src: "~/.kube/config"
+        dest: "~/.kube/config"
+        flat: yes
+      become: no
+
     - name: Add AWS EBS CSI Driver Helm repository
       command: helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver
       become: no
