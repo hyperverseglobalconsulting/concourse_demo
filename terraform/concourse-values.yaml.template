@@ -4,7 +4,7 @@ concourse:
     worker:
       size: "20Gi"
   web:
-    externalUrl: "http://{{ ELB_HOSTNAME }}/"
+    externalUrl: "http://{{ ELB_HOSTNAME }}/concourse"
     service:
       ports:
         http-atc: 8080
