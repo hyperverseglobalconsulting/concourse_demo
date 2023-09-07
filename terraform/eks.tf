@@ -104,10 +104,6 @@ resource "aws_eks_node_group" "node_group" {
     EKS       = "concourse-k8s"
   }
 
-#  depends_on = [
-#    aws_eks_cluster.cluster,
-#    aws_key_pair.kp
-#  ]
 }
 
 resource "aws_iam_role_policy_attachment" "eks_node_group_policy_attachment_1" {
