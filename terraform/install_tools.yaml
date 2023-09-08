@@ -194,6 +194,30 @@
         helm install istiod istio/istiod -n istio-system --wait
       become: no
 
+    - name: Install Istio Ingress Gateway
+      command: >
+        helm install istio-ingressgateway istio/gateway -n istio-system --wait
+      become: no
+
+    - name: Validate Istio Ingress Gateway Installation
+      command: helm ls -n istio-system
+      register: helm_ls_ingress_output
+      changed_when: false
+      failed_when: "'istio-ingressgateway' not in helm_ls_ingress_output.stdout"
+      become: no
+
+    - name: Install Istio CNI
+      command: >
+        helm install istio-cni istio/cni -n kube-system --wait
+      become: no
+
+    - name: Validate Istio CNI Installation
+      command: helm ls -n kube-system
+      register: helm_ls_cni_output
+      changed_when: false
+      failed_when: "'istio-cni' not in helm_ls_cni_output.stdout"
+      become: no
+
     - name: Validate Istio Discovery Chart Installation
       command: helm ls -n istio-system
       register: helm_ls_discovery_output
