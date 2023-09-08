@@ -12,7 +12,9 @@ spec:
   http:
   - match:
     - uri:
-        prefix: /
+        regex: "\/concourse\/?$"
+    rewrite:
+      uri: /
     route:
     - destination:
         host: concourse-web.cicd.svc.cluster.local  # Corrected to point to the service in the `cicd` namespace
