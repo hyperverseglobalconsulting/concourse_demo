@@ -339,26 +339,58 @@
       when: elb_hostname_result.stdout != ""
       become: no
 
-    - name: Generate VirtualService YAML from template
-      command:
-        cmd: "cat ~/concourse_demo/api-routes/virtualservice.yaml.template"
-      register: template_content
+    - name: Find all template files in the directory
+      find:
+        paths: "~/concourse_demo/api-routes"
+        patterns: "*.yaml.template"
+      register: template_files
       changed_when: false
       when: elb_hostname_result.stdout != ""
       become: no
 
-    - name: Replace HOSTNAME in template
-      copy:
-        dest: "~/concourse_demo/api-routes/virtualservice.yaml"
-        content: "{{ template_content.stdout | replace('{{ HOSTNAME }}', elb_hostname_result.stdout) }}"
+    - name: Read content from template
+      command:
+        cmd: "cat {{ item.path }}"
+      register: template_content
+      loop: "{{ template_files.files }}"
+      changed_when: false
       when: elb_hostname_result.stdout != ""
       become: no
 
-    # Assuming you want to apply this ingress after creation
-    - name: Apply the VirtualService to the Kubernetes Cluster
-      command: kubectl apply -f ~/concourse_demo/api-routes/virtualservice.yaml
+    - name: Replace HOSTNAME in template and write to destination
+      copy:
+        dest: "{{ item.path | regex_replace('.yaml.template$', '.yaml') }}"
+        content: "{{ template_content.results | selectattr('item.path', 'equalto', item.path) | map(attribute='stdout') | first | replace('{{ HOSTNAME }}', elb_hostname_result.stdout) }}"
+      loop: "{{ template_files.files }}"
       when: elb_hostname_result.stdout != ""
       become: no
+
+    - name: Apply the VirtualService to the Kubernetes Cluster
+      command: "kubectl apply -f {{ item.path | regex_replace('.yaml.template$', '.yaml') }}"
+      loop: "{{ template_files.files }}"
+      when: elb_hostname_result.stdout != ""
+      become: no
+
+#    - name: Generate VirtualService YAML from template
+#      command:
+#        cmd: "cat ~/concourse_demo/api-routes/virtualservice.yaml.template"
+#      register: template_content
+#      changed_when: false
+#      when: elb_hostname_result.stdout != ""
+#      become: no
+#
+#    - name: Replace HOSTNAME in template
+#      copy:
+#        dest: "~/concourse_demo/api-routes/virtualservice.yaml"
+#        content: "{{ template_content.stdout | replace('{{ HOSTNAME }}', elb_hostname_result.stdout) }}"
+#      when: elb_hostname_result.stdout != ""
+#      become: no
+#
+#    # Assuming you want to apply this ingress after creation
+#    - name: Apply the VirtualService to the Kubernetes Cluster
+#      command: kubectl apply -f ~/concourse_demo/api-routes/virtualservice.yaml
+#      when: elb_hostname_result.stdout != ""
+#      become: no
 
     - name: Add the MarkLogic Helm Repository
       command: helm repo add marklogic https://marklogic.github.io/marklogic-kubernetes/

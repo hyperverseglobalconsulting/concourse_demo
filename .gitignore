@@ -3,7 +3,7 @@
 .*.swp
 .*.swo
 *.bkp
-/bkp/
+**/bkp/
 *.out
 *.pem
 *.log

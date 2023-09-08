@@ -1,20 +1,28 @@
+---
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: concourse-web-virtualservice
-  namespace: cicd
+  name: istio-addons-web-virtualservice
+  namespace: istio-system
 spec:
   hosts:
   - "{{ HOSTNAME }}"
   gateways:
-  - istio-ingress/concourse-web-gateway  # Reference the Gateway in the `istio-ingress` namespace
+  - istio-ingress/concourse-web-gateway  # Use the same gateway
   http:
   - match:
     - uri:
-        prefix: /
+        prefix: /grafana
     route:
     - destination:
-        host: concourse-web.cicd.svc.cluster.local  # Corrected to point to the service in the `cicd` namespace
+        host: grafana.istio-system.svc.cluster.local
         port:
-          number: 8080
-
+          number: 3000
+  - match:
+    - uri:
+        prefix: /jaeger
+    route:
+    - destination:
+        host: tracing.istio-system.svc.cluster.local  # Jaeger's service name in Istio is 'tracing'
+        port:
+          number: 80
