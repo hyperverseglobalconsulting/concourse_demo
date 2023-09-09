@@ -357,30 +357,30 @@
         mode: '0755'
       when: concourse_version is defined
 
-    - name: Add the MarkLogic Helm Repository
-      command: helm repo add marklogic https://marklogic.github.io/marklogic-kubernetes/
-      become: no
-
-    - name: Update Helm Repositories
-      command: helm repo update
-      become: no
-
-    - name: Create a Namespace for MarkLogic
-      command: kubectl create namespace marklogic
-      ignore_errors: true  # To ignore the error if the namespace already exists.
-      become: no
-
-    - name: Label the namespace for Istio sidecar injection
-      command: kubectl label namespace marklogic istio-injection=enabled
-      ignore_errors: true  # To ignore the error if the label already exists.
-      become: no
-
-    - name: Install MarkLogic using Helm
-      command: >
-        helm install marklogic marklogic/marklogic --namespace marklogic -f ~/concourse_demo/services/marklogic/marklogic_values.yaml
-      args:
-        creates: "marklogic"  # This ensures idempotency. It avoids reinstalling if 'marklogic' already exists.
-      become: no
+#    - name: Add the MarkLogic Helm Repository
+#      command: helm repo add marklogic https://marklogic.github.io/marklogic-kubernetes/
+#      become: no
+#
+#    - name: Update Helm Repositories
+#      command: helm repo update
+#      become: no
+#
+#    - name: Create a Namespace for MarkLogic
+#      command: kubectl create namespace marklogic
+#      ignore_errors: true  # To ignore the error if the namespace already exists.
+#      become: no
+#
+#    - name: Label the namespace for Istio sidecar injection
+#      command: kubectl label namespace marklogic istio-injection=enabled
+#      ignore_errors: true  # To ignore the error if the label already exists.
+#      become: no
+#
+#    - name: Install MarkLogic using Helm
+#      command: >
+#        helm install marklogic marklogic/marklogic --namespace marklogic -f ~/concourse_demo/services/marklogic/marklogic_values.yaml
+#      args:
+#        creates: "marklogic"  # This ensures idempotency. It avoids reinstalling if 'marklogic' already exists.
+#      become: no
 
     # Assuming you want to apply this ingress after creation
     - name: Apply the Gateway to the Kubernetes Cluster
