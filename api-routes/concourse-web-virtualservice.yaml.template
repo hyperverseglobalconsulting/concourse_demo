@@ -12,7 +12,7 @@ spec:
   http:
   - match:
     - uri:
-        regex: "\/concourse\/?$"
+        prefix: /concourse/
     rewrite:
       uri: /
     route:
